@@ -1,0 +1,43 @@
+databases:
+  - name: campana360-db
+    plan: free
+    databaseName: campana360
+    user: campana360
+
+services:
+  - type: web
+    name: campana360-backend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: "sh -c \"python -m app.initial_data && uvicorn app.main:app --host 0.0.0.0 --port 8000\""
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: campana360-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "480"
+      - key: REFRESH_TOKEN_EXPIRE_MINUTES
+        value: "10080"
+      - key: BACKEND_CORS_ORIGINS
+        value: '["*"]'
+
+  - type: web
+    name: campana360-frontend
+    runtime: docker
+    plan: free
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
+    envVars:
+      # Render conecta esto automáticamente con el hostname público
+      # del backend en cuanto ambos servicios existen. No requiere edición manual.
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: campana360-backend
+          property: host
