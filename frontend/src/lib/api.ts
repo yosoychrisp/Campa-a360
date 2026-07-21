@@ -1,8 +1,13 @@
 import axios from "axios";
 
-export const api = axios.create({
-  baseURL: "/api/v1",
-});
+const API_BASE_URL =
+     process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.startsWith("http")
+       ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
+       : "https://campana360-backend.onrender.com/api/v1";
+
+   export const api = axios.create({
+     baseURL: API_BASE_URL,
+   });
 
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
