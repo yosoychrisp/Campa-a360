@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Plus, Search, Download, Upload } from "lucide-react";
+import { Plus, Search, Download, Upload, X } from "lucide-react";
 import { api, Contact, ContactPage } from "@/lib/api";
 
 const ESTADO_STYLES: Record<string, string> = {
@@ -16,39 +16,111 @@ const DEMO: Contact[] = [
   { id: "3", nombre: "Ana", apellido: "Ramírez", telefono: "3009988776", correo: "ana@correo.com", estado: "activo", fecha_creacion: new Date().toISOString() },
 ];
 
+const FORM_INICIAL = {
+  nombre: "",
+  apellido: "",
+  documento: "",
+  telefono: "",
+  correo: "",
+  direccion: "",
+};
+
 export default function ContactosPage() {
   const [query, setQuery] = useState("");
-  const [data, setData] = useState<ContactPage>({ total: DEMO.length, page: 1, page_size: 25, items: DEMO });
+  const [data, setData] = useState<ContactPage>({ total: 0, page: 1, page_size: 25, items: [] });
+  const [usandoDemo, setUsandoDemo] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState(FORM_INICIAL);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  function cargarContactos() {
+    api
+      .get<ContactPage>("/contacts", { params: { q: query || undefined, page: 1, page_size: 25 } })
+      .then((r) => {
+        setData(r.data);
+        setUsandoDemo(false);
+      })
+      .catch(() => {
+        setData({ total: DEMO.length, page: 1, page_size: 25, items: DEMO });
+        setUsandoDemo(true);
+      });
+  }
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      api
-        .get<ContactPage>("/contacts", { params: { q: query || undefined, page: 1, page_size: 25 } })
-        .then((r) => setData(r.data))
-        .catch(() => {}); // conserva datos demo si el backend aún no está conectado
-    }, 300);
+    const timeout = setTimeout(cargarContactos, 300);
     return () => clearTimeout(timeout);
   }, [query]);
+
+  async function crearContacto() {
+    setError("");
+    if (!form.nombre.trim() || !form.apellido.trim()) {
+      setError("Nombre y apellido son obligatorios.");
+      return;
+    }
+    setGuardando(true);
+    try {
+      await api.post("/contacts", {
+        nombre: form.nombre,
+        apellido: form.apellido,
+        documento: form.documento || null,
+        telefono: form.telefono || null,
+        correo: form.correo || null,
+        direccion: form.direccion || null,
+        estado: "pendiente",
+        acepta_comunicaciones: "no",
+      });
+      setForm(FORM_INICIAL);
+      setShowForm(false);
+      cargarContactos();
+    } catch (e: any) {
+      setError(
+        e?.response?.data?.detail
+          ? String(e.response.data.detail)
+          : "No se pudo guardar el contacto. Verifica tu conexión con el servidor."
+      );
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-semibold">Contactos</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{data.total} contactos registrados</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {data.total} contactos registrados
+            {usandoDemo && " (mostrando datos de ejemplo, sin conexión al servidor)"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button className="btn-primary bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 dark:bg-surface-cardDark dark:text-slate-200 dark:border-slate-700">
             <Upload size={16} /> Importar
           </button>
-          <button className="btn-primary bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 dark:bg-surface-cardDark dark:text-slate-200 dark:border-slate-700">
+          <a href="/api/v1/contacts/export/excel" className="btn-primary bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 dark:bg-surface-cardDark dark:text-slate-200 dark:border-slate-700">
             <Download size={16} /> Exportar
-          </button>
-          <button className="btn-primary">
-            <Plus size={16} /> Nuevo contacto
+          </a>
+          <button className="btn-primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? <X size={16} /> : <Plus size={16} />} {showForm ? "Cancelar" : "Nuevo contacto"}
           </button>
         </div>
       </div>
+
+      {showForm && (
+        <div className="card grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <input className="input" placeholder="Nombre *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+          <input className="input" placeholder="Apellido *" value={form.apellido} onChange={(e) => setForm({ ...form, apellido: e.target.value })} />
+          <input className="input" placeholder="Documento" value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} />
+          <input className="input" placeholder="Teléfono" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
+          <input className="input" placeholder="Correo" value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} />
+          <input className="input" placeholder="Dirección" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} />
+          {error && <p className="sm:col-span-2 text-sm text-rose-600">{error}</p>}
+          <button className="btn-primary sm:col-span-2 justify-center" onClick={crearContacto} disabled={guardando}>
+            {guardando ? "Guardando..." : "Guardar contacto"}
+          </button>
+        </div>
+      )}
 
       <div className="relative max-w-md">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -87,6 +159,9 @@ export default function ContactosPage() {
                 </td>
               </tr>
             ))}
+            {data.items.length === 0 && (
+              <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400">Aún no hay contactos. Crea el primero con el botón de arriba.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
