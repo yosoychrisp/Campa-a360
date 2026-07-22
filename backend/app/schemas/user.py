@@ -24,9 +24,14 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 
-class UserOut(UserBase):
+class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
+    full_name: str
+    email: str
+    role: RoleEnum
+    phone: Optional[str] = None
+    is_active: bool = True
 
 
 class Token(BaseModel):
