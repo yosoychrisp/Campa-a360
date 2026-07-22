@@ -37,6 +37,7 @@ export interface Contact {
   estado: string;
   fecha_creacion: string;
   ultimo_contacto?: string;
+  leader_id?: string;
 }
 
 export interface ContactPage {
