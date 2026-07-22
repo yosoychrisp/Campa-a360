@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Plus, Search, Download, Upload, X } from "lucide-react";
-import { api, Contact, ContactPage } from "@/lib/api";
+import { api, Contact, ContactPage, AppUser } from "@/lib/api";
 
 const ESTADO_STYLES: Record<string, string> = {
   activo: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
@@ -23,11 +23,14 @@ const FORM_INICIAL = {
   telefono: "",
   correo: "",
   direccion: "",
+  leader_id: "",
 };
 
 export default function ContactosPage() {
   const [query, setQuery] = useState("");
+  const [filtroLider, setFiltroLider] = useState("");
   const [data, setData] = useState<ContactPage>({ total: 0, page: 1, page_size: 25, items: [] });
+  const [usuarios, setUsuarios] = useState<AppUser[]>([]);
   const [usandoDemo, setUsandoDemo] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(FORM_INICIAL);
@@ -36,7 +39,9 @@ export default function ContactosPage() {
 
   function cargarContactos() {
     api
-      .get<ContactPage>("/contacts", { params: { q: query || undefined, page: 1, page_size: 25 } })
+      .get<ContactPage>("/contacts", {
+        params: { q: query || undefined, leader_id: filtroLider || undefined, page: 1, page_size: 50 },
+      })
       .then((r) => {
         setData(r.data);
         setUsandoDemo(false);
@@ -47,10 +52,27 @@ export default function ContactosPage() {
       });
   }
 
+  function cargarUsuarios() {
+    api
+      .get<AppUser[]>("/users")
+      .then((r) => setUsuarios(r.data))
+      .catch(() => setUsuarios([]));
+  }
+
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
+
   useEffect(() => {
     const timeout = setTimeout(cargarContactos, 300);
     return () => clearTimeout(timeout);
-  }, [query]);
+  }, [query, filtroLider]);
+
+  function nombreLider(id?: string) {
+    if (!id) return "—";
+    const u = usuarios.find((u) => u.id === id);
+    return u ? u.full_name : "—";
+  }
 
   async function crearContacto() {
     setError("");
@@ -67,6 +89,7 @@ export default function ContactosPage() {
         telefono: form.telefono || null,
         correo: form.correo || null,
         direccion: form.direccion || null,
+        leader_id: form.leader_id || null,
         estado: "pendiente",
         acepta_comunicaciones: "no",
       });
@@ -115,6 +138,18 @@ export default function ContactosPage() {
           <input className="input" placeholder="Teléfono" value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
           <input className="input" placeholder="Correo" value={form.correo} onChange={(e) => setForm({ ...form, correo: e.target.value })} />
           <input className="input" placeholder="Dirección" value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} />
+          <select
+            className="input sm:col-span-2"
+            value={form.leader_id}
+            onChange={(e) => setForm({ ...form, leader_id: e.target.value })}
+          >
+            <option value="">Sin encargado asignado</option>
+            {usuarios.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.full_name} ({u.role})
+              </option>
+            ))}
+          </select>
           {error && <p className="sm:col-span-2 text-sm text-rose-600">{error}</p>}
           <button className="btn-primary sm:col-span-2 justify-center" onClick={crearContacto} disabled={guardando}>
             {guardando ? "Guardando..." : "Guardar contacto"}
@@ -122,14 +157,28 @@ export default function ContactosPage() {
         </div>
       )}
 
-      <div className="relative max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          className="input pl-9"
-          placeholder="Buscar por nombre, documento o teléfono..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative max-w-md flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            className="input pl-9"
+            placeholder="Buscar por nombre, documento o teléfono..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+        <select
+          className="input max-w-xs"
+          value={filtroLider}
+          onChange={(e) => setFiltroLider(e.target.value)}
+        >
+          <option value="">Todos los encargados</option>
+          {usuarios.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.full_name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="card p-0 overflow-hidden">
@@ -139,6 +188,7 @@ export default function ContactosPage() {
               <th className="px-5 py-3 font-medium">Nombre</th>
               <th className="px-5 py-3 font-medium">Teléfono</th>
               <th className="px-5 py-3 font-medium">Correo</th>
+              <th className="px-5 py-3 font-medium">Encargado</th>
               <th className="px-5 py-3 font-medium">Estado</th>
               <th className="px-5 py-3 font-medium">Registrado</th>
             </tr>
@@ -149,6 +199,7 @@ export default function ContactosPage() {
                 <td className="px-5 py-3 font-medium">{c.nombre} {c.apellido}</td>
                 <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{c.telefono ?? "—"}</td>
                 <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{c.correo ?? "—"}</td>
+                <td className="px-5 py-3 text-slate-500 dark:text-slate-400">{nombreLider(c.leader_id)}</td>
                 <td className="px-5 py-3">
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ESTADO_STYLES[c.estado] ?? ""}`}>
                     {c.estado}
@@ -160,7 +211,7 @@ export default function ContactosPage() {
               </tr>
             ))}
             {data.items.length === 0 && (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400">Aún no hay contactos. Crea el primero con el botón de arriba.</td></tr>
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-400">Aún no hay contactos. Crea el primero con el botón de arriba.</td></tr>
             )}
           </tbody>
         </table>
