@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     auth, users, contacts, dashboard, territorial, agenda,
-    communications, reports, audit, settings as settings_endpoint,
+    communications, reports, audit, settings as settings_endpoint, backup,
 )
 
 api_router = APIRouter()
@@ -15,3 +15,4 @@ api_router.include_router(communications.router, prefix="/comunicaciones", tags=
 api_router.include_router(reports.router, prefix="/reportes", tags=["Reportes"])
 api_router.include_router(audit.router, prefix="/auditoria", tags=["Seguridad / Auditoría"])
 api_router.include_router(settings_endpoint.router, prefix="/configuracion", tags=["Configuración"])
+api_router.include_router(backup.router, prefix="/backup", tags=["Respaldo Google Drive"])
