@@ -1,7 +1,7 @@
 import uuid
 import io
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -12,6 +12,7 @@ from app.models.user import User, RoleEnum
 from app.models.contact import Contact, ContactStatus, Seguimiento
 from app.models.audit import AuditLog
 from app.schemas.contact import ContactOut, ContactCreate, ContactUpdate, ContactPage
+from app.services.backup import sync_contacts_to_drive
 from pydantic import BaseModel
 import datetime
 
@@ -78,6 +79,7 @@ def list_contacts(
 @router.post("/", response_model=ContactOut, status_code=201)
 def create_contact(
     payload: ContactCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -88,6 +90,7 @@ def create_contact(
     db.add(AuditLog(usuario_id=current_user.id, accion="CREATE_CONTACT", entidad="Contact", entidad_id=str(contact.id)))
     db.commit()
     db.refresh(contact)
+    background_tasks.add_task(sync_contacts_to_drive)
     return contact
 
 
@@ -107,6 +110,7 @@ def get_contact(
 def update_contact(
     contact_id: uuid.UUID,
     payload: ContactUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -118,12 +122,14 @@ def update_contact(
     db.add(AuditLog(usuario_id=current_user.id, accion="UPDATE_CONTACT", entidad="Contact", entidad_id=str(contact.id)))
     db.commit()
     db.refresh(contact)
+    background_tasks.add_task(sync_contacts_to_drive)
     return contact
 
 
 @router.delete("/{contact_id}", status_code=204)
 def delete_contact(
     contact_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.COORDINADOR)),
 ):
@@ -133,6 +139,7 @@ def delete_contact(
     db.delete(contact)
     db.add(AuditLog(usuario_id=current_user.id, accion="DELETE_CONTACT", entidad="Contact", entidad_id=str(contact_id)))
     db.commit()
+    background_tasks.add_task(sync_contacts_to_drive)
 
 
 @router.get("/export/excel")
@@ -164,6 +171,7 @@ def export_excel(
 
 @router.post("/import/excel", status_code=201)
 def import_excel(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_roles(RoleEnum.ADMIN, RoleEnum.COORDINADOR, RoleEnum.DIGITADOR)),
@@ -184,6 +192,7 @@ def import_excel(
         db.add(contact)
         created += 1
     db.commit()
+    background_tasks.add_task(sync_contacts_to_drive)
     return {"contactos_creados": created}
 
 
