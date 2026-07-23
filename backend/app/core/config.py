@@ -22,9 +22,10 @@ class Settings(BaseSettings):
     WHATSAPP_API_TOKEN: str = ""
     WHATSAPP_PHONE_NUMBER_ID: str = ""
     WHATSAPP_API_VERSION: str = "v20.0"
+
     # Respaldo automático en Google Drive
-   GOOGLE_SERVICE_ACCOUNT_JSON: str = ""
-   GOOGLE_DRIVE_FOLDER_ID: str = ""
+    GOOGLE_SERVICE_ACCOUNT_JSON: str = ""  # contenido completo del archivo JSON de la cuenta de servicio
+    GOOGLE_DRIVE_FOLDER_ID: str = ""  # ID de la carpeta de Drive donde se guarda el respaldo
 
     class Config:
         env_file = ".env"
