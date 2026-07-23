@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Settings as SettingsIcon, Save, Palette, Building2 } from "lucide-react";
+import { Save, Palette, Building2, HardDrive, CheckCircle2, XCircle } from "lucide-react";
 import { api, AppSettings } from "@/lib/api";
 
 export default function ConfiguracionPage() {
@@ -11,9 +11,14 @@ export default function ConfiguracionPage() {
     color_acento: "#f4a13a",
   });
   const [saved, setSaved] = useState(false);
+  const [driveConectado, setDriveConectado] = useState<boolean | null>(null);
 
   useEffect(() => {
     api.get<AppSettings>("/configuracion").then((r) => setSettings(r.data)).catch(() => {});
+    api
+      .get<{ conectado: boolean }>("/backup/estado")
+      .then((r) => setDriveConectado(r.data.conectado))
+      .catch(() => setDriveConectado(null));
   }, []);
 
   async function guardar() {
@@ -86,6 +91,25 @@ export default function ConfiguracionPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="card space-y-3">
+        <h2 className="font-display font-semibold flex items-center gap-2">
+          <HardDrive size={18} className="text-emerald-500" /> Respaldo automático en Google Drive
+        </h2>
+        {driveConectado === true && (
+          <p className="text-sm flex items-center gap-2 text-emerald-600">
+            <CheckCircle2 size={16} /> Conectado. Cada cambio en contactos se respalda automáticamente.
+          </p>
+        )}
+        {driveConectado === false && (
+          <p className="text-sm flex items-center gap-2 text-amber-600">
+            <XCircle size={16} /> Aún no está configurado. Pide al administrador que complete la conexión con Google Drive en el servidor.
+          </p>
+        )}
+        {driveConectado === null && (
+          <p className="text-sm text-slate-400">Consultando estado...</p>
+        )}
       </div>
 
       <button className="btn-primary" onClick={guardar}>
